@@ -85,6 +85,22 @@ DUMMYJSON_TIMEOUT_SECONDS = float(
     os.getenv('DUMMYJSON_TIMEOUT_SECONDS', '10'),
 )
 
+REDIS_CACHE_URL = os.getenv(
+    'REDIS_CACHE_URL',
+    'redis://localhost:6379/1',
+)
+AVG_PRICE_CACHE_TTL_SECONDS = int(
+    os.getenv('AVG_PRICE_CACHE_TTL_SECONDS', '300'),
+)
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_CACHE_URL,
+        'TIMEOUT': AVG_PRICE_CACHE_TTL_SECONDS,
+    }
+}
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

@@ -20,11 +20,29 @@ class ItemSerializer(serializers.ModelSerializer):
 
 
 class ItemListQuerySerializer(serializers.Serializer):
-    category = serializers.CharField(required=False, allow_blank=False, max_length=128,)
-    price_min = serializers.DecimalField(required=False, min_value=Decimal('0'), max_digits=12, decimal_places=2,)
-    price_max = serializers.DecimalField(required=False, min_value=Decimal('0'), max_digits=12, decimal_places=2,)
+    category = serializers.CharField(
+        required=False,
+        allow_blank=False,
+        max_length=128,
+    )
+    price_min = serializers.DecimalField(
+        required=False,
+        min_value=Decimal('0'),
+        max_digits=12,
+        decimal_places=2,
+    )
+    price_max = serializers.DecimalField(
+        required=False,
+        min_value=Decimal('0'),
+        max_digits=12,
+        decimal_places=2,
+    )
     page = serializers.IntegerField(required=False, min_value=1)
-    page_size = serializers.IntegerField(required=False, min_value=1, max_value=100,)
+    page_size = serializers.IntegerField(
+        required=False,
+        min_value=1,
+        max_value=100,
+    )
 
     def validate(self, attrs: dict) -> dict:
         price_min = attrs.get('price_min')
@@ -38,3 +56,11 @@ class ItemListQuerySerializer(serializers.Serializer):
             )
 
         return attrs
+
+
+class AveragePriceByCategorySerializer(serializers.Serializer):
+    category = serializers.CharField()
+    average_price = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )

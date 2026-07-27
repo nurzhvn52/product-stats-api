@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from items.models import Item
 from items.services.normalization import normalize_dummyjson_products
+from items.services.statistics import invalidate_average_price_cache
 
 logger = logging.getLogger(__name__)
 PRICE_QUANTUM = Decimal('0.01')
@@ -130,6 +131,9 @@ def persist_normalized_products(products: pd.DataFrame) -> PersistenceResult:
         batch_size=UPSERT_BATCH_SIZE,
     )
 
+    if items_to_create or items_to_update:
+        transaction.on_commit(invalidate_average_price_cache, robust=True)
+
     return PersistenceResult(
         created=len(items_to_create),
         updated=len(items_to_update),
@@ -137,7 +141,9 @@ def persist_normalized_products(products: pd.DataFrame) -> PersistenceResult:
     )
 
 
-def import_product_records(records: list[dict], source: str = 'dummyjson') -> ImportResult:
+def import_product_records(
+    records: list[dict], source: str = 'dummyjson'
+) -> ImportResult:
     normalized_products = normalize_dummyjson_products(records, source=source)
     persistence = persist_normalized_products(normalized_products)
     result = ImportResult(

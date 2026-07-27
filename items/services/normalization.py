@@ -28,12 +28,16 @@ def empty_normalized_products() -> pd.DataFrame:
     return pd.DataFrame(columns=list(NORMALIZED_COLUMNS))
 
 
-def normalize_dummyjson_products(products: Sequence[dict[str, Any]], source: str = 'dummyjson') -> pd.DataFrame:
+def normalize_dummyjson_products(
+    products: Sequence[dict[str, Any]], source: str = 'dummyjson'
+) -> pd.DataFrame:
     normalized_source = source.strip().lower()
     if not normalized_source:
         raise ProductNormalizationError('Product source name cannot be empty.')
     if len(normalized_source) > 50:
-        raise ProductNormalizationError('Product source name cannot be longer than 50 characters.')
+        raise ProductNormalizationError(
+            'Product source name cannot be longer than 50 characters.'
+        )
 
     if not products:
         return empty_normalized_products()
@@ -42,18 +46,32 @@ def normalize_dummyjson_products(products: Sequence[dict[str, Any]], source: str
     missing_columns = REQUIRED_DUMMYJSON_COLUMNS.difference(source_frame.columns)
     if missing_columns:
         missing = ', '.join(sorted(missing_columns))
-        raise ProductNormalizationError(f'DummyJSON payload is missing required fields: {missing}.')
+        raise ProductNormalizationError(
+            f'DummyJSON payload is missing required fields: {missing}.'
+        )
 
     external_ids = pd.to_numeric(source_frame['id'], errors='coerce')
-    valid_external_ids = (external_ids.notna() & external_ids.gt(0) & external_ids.mod(1).eq(0))
+    valid_external_ids = (
+        external_ids.notna() & external_ids.gt(0) & external_ids.mod(1).eq(0)
+    )
 
     normalized = pd.DataFrame(index=source_frame.index)
     normalized['source'] = normalized_source
-    normalized['external_id'] = (external_ids.where(valid_external_ids).astype('Int64').astype('string'))
+    normalized['external_id'] = (
+        external_ids.where(valid_external_ids).astype('Int64').astype('string')
+    )
     normalized['name'] = source_frame['title'].astype('string').str.strip()
-    normalized['category'] = source_frame['category'].astype('string').str.strip().str.lower()
-    normalized['price'] = pd.to_numeric(source_frame['price'], errors='coerce').astype('float64')
-    normalized['updated_at'] = pd.to_datetime(source_frame['meta.updatedAt'], errors='coerce', utc=True,)
+    normalized['category'] = (
+        source_frame['category'].astype('string').str.strip().str.lower()
+    )
+    normalized['price'] = pd.to_numeric(source_frame['price'], errors='coerce').astype(
+        'float64'
+    )
+    normalized['updated_at'] = pd.to_datetime(
+        source_frame['meta.updatedAt'],
+        errors='coerce',
+        utc=True,
+    )
 
     valid_rows = (
         normalized['external_id'].notna()
@@ -72,7 +90,10 @@ def normalize_dummyjson_products(products: Sequence[dict[str, Any]], source: str
 
     normalized = normalized.loc[valid_rows].copy()
     normalized = normalized.sort_values('updated_at', kind='stable')
-    normalized = normalized.drop_duplicates(subset=['source', 'external_id'], keep='last',)
+    normalized = normalized.drop_duplicates(
+        subset=['source', 'external_id'],
+        keep='last',
+    )
     normalized = normalized.sort_index().reset_index(drop=True)
 
     return normalized.loc[:, list(NORMALIZED_COLUMNS)]
@@ -83,7 +104,9 @@ def calculate_average_price_by_category(products: pd.DataFrame) -> pd.DataFrame:
     missing_columns = required_columns.difference(products.columns)
     if missing_columns:
         missing = ', '.join(sorted(missing_columns))
-        raise ProductNormalizationError(f'Normalized products are missing required columns: {missing}.')
+        raise ProductNormalizationError(
+            f'Normalized products are missing required columns: {missing}.'
+        )
 
     prices = products.loc[:, ['category', 'price']].copy()
     prices['category'] = prices['category'].astype('string').str.strip()

@@ -37,7 +37,11 @@ def extract_products(payload: Any) -> list[dict[str, Any]]:
     return products
 
 
-def fetch_dummyjson_products(url: str = DEFAULT_DUMMYJSON_PRODUCTS_URL, timeout: float = DEFAULT_TIMEOUT_SECONDS, session: requests.Session | None = None) -> list[dict[str, Any]]:
+def fetch_dummyjson_products(
+    url: str = DEFAULT_DUMMYJSON_PRODUCTS_URL,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    session: requests.Session | None = None,
+) -> list[dict[str, Any]]:
     owns_session = session is None
     client = session or requests.Session()
 

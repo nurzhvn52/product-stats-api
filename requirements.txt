@@ -3,4 +3,5 @@ djangorestframework==3.17.1
 pandas==3.0.3
 psycopg[binary]==3.3.4
 python-dotenv==1.2.2
+redis==6.4.0
 requests==2.34.2

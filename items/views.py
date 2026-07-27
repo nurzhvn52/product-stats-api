@@ -1,9 +1,16 @@
 from django.db.models import QuerySet
 from rest_framework.generics import ListAPIView
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from items.models import Item
 from items.pagination import ItemPagination
-from items.serializers import ItemListQuerySerializer, ItemSerializer
+from items.serializers import (
+    AveragePriceByCategorySerializer,
+    ItemListQuerySerializer,
+    ItemSerializer,
+)
+from items.services.statistics import get_average_price_statistics
 
 
 class ItemListView(ListAPIView):
@@ -29,3 +36,15 @@ class ItemListView(ListAPIView):
             queryset = queryset.filter(price__lte=price_max)
 
         return queryset
+
+
+class AveragePriceByCategoryView(APIView):
+    def get(self, request) -> Response:
+        statistics = get_average_price_statistics()
+        serializer = AveragePriceByCategorySerializer(
+            statistics.data,
+            many=True,
+        )
+        response = Response(serializer.data)
+        response['X-Cache'] = statistics.cache_status
+        return response
