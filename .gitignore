@@ -1,22 +1,16 @@
-# Python
-__pycache__/
-*.py[cod]
-*.pyo
+# Ruff
+.ruff_cache/
 
-# Virtual environments
-.venv/
-venv/
-
-# Environment variables
+# Environment variants
 .env
+.env.*
+!.env.example
 
-# Test and coverage artifacts
-.pytest_cache/
-.coverage
-htmlcov/
+# Local databases
+*.sqlite3
 
-# IDEs and operating systems
-.idea/
-.vscode/
-.DS_Store
-Thumbs.db
+# Logs
+*.log
+
+# Celery Beat
+celerybeat-schedule*

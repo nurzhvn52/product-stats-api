@@ -3,7 +3,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
@@ -18,9 +17,7 @@ def get_bool_env(name: str, default: bool = False) -> bool:
 
 def get_list_env(name: str, default: str = '') -> list[str]:
     return [
-        value.strip()
-        for value in os.getenv(name, default).split(',')
-        if value.strip()
+        value.strip() for value in os.getenv(name, default).split(',') if value.strip()
     ]
 
 
@@ -79,3 +76,11 @@ USE_TZ = True
 APPEND_SLASH = False
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+DUMMYJSON_PRODUCTS_URL = os.getenv(
+    'DUMMYJSON_PRODUCTS_URL',
+    'https://dummyjson.com/products?limit=0',
+)
+DUMMYJSON_TIMEOUT_SECONDS = float(
+    os.getenv('DUMMYJSON_TIMEOUT_SECONDS', '10'),
+)

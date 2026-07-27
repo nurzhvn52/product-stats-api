@@ -1,0 +1,15 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = 'config.settings'
+addopts = '-ra'
+testpaths = ['tests']
+
+[tool.ruff]
+target-version = 'py312'
+line-length = 88
+extend-exclude = ['items/migrations']
+
+[tool.ruff.lint]
+select = ['E', 'F', 'I', 'UP', 'B', 'SIM']
+
+[tool.ruff.format]
+quote-style = 'single'
