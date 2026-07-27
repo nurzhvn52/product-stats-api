@@ -84,3 +84,20 @@ DUMMYJSON_PRODUCTS_URL = os.getenv(
 DUMMYJSON_TIMEOUT_SECONDS = float(
     os.getenv('DUMMYJSON_TIMEOUT_SECONDS', '10'),
 )
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'items': {
+            'handlers': ['console'],
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
+            'propagate': False,
+        },
+    },
+}

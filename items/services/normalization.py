@@ -32,6 +32,8 @@ def normalize_dummyjson_products(products: Sequence[dict[str, Any]], source: str
     normalized_source = source.strip().lower()
     if not normalized_source:
         raise ProductNormalizationError('Product source name cannot be empty.')
+    if len(normalized_source) > 50:
+        raise ProductNormalizationError('Product source name cannot be longer than 50 characters.')
 
     if not products:
         return empty_normalized_products()
@@ -59,8 +61,12 @@ def normalize_dummyjson_products(products: Sequence[dict[str, Any]], source: str
         & normalized['name'].ne('')
         & normalized['category'].notna()
         & normalized['category'].ne('')
+        & normalized['external_id'].str.len().le(128)
+        & normalized['name'].str.len().le(255)
+        & normalized['category'].str.len().le(128)
         & normalized['price'].notna()
         & normalized['price'].ge(0)
+        & normalized['price'].lt(10_000_000_000)
         & normalized['updated_at'].notna()
     )
 
