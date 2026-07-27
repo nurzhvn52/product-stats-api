@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -98,6 +99,30 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': REDIS_CACHE_URL,
         'TIMEOUT': AVG_PRICE_CACHE_TTL_SECONDS,
+    }
+}
+
+CELERY_BROKER_URL = os.getenv(
+    'CELERY_BROKER_URL',
+    'redis://localhost:6379/0',
+)
+CELERY_TASK_IGNORE_RESULT = True
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TIMEZONE = TIME_ZONE
+
+CELERY_IMPORT_INTERVAL_MINUTES = int(
+    os.getenv('CELERY_IMPORT_INTERVAL_MINUTES', '15'),
+)
+CELERY_IMPORT_LOCK_TIMEOUT_SECONDS = int(
+    os.getenv('CELERY_IMPORT_LOCK_TIMEOUT_SECONDS', '600'),
+)
+
+CELERY_BEAT_SCHEDULE = {
+    'import-dummyjson-products': {
+        'task': 'items.import_dummyjson_products',
+        'schedule': timedelta(minutes=CELERY_IMPORT_INTERVAL_MINUTES),
     }
 }
 

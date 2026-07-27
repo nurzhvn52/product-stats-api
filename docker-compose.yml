@@ -1,0 +1,117 @@
+name: product-statistics
+
+x-app: &app
+  image: product-statistics-app:local
+  environment:
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-docker-development-secret-key}
+    DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,web}
+    POSTGRES_DB: ${POSTGRES_DB:-product_statistics}
+    POSTGRES_USER: ${POSTGRES_USER:-product_statistics}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-product_statistics}
+    POSTGRES_HOST: db
+    POSTGRES_PORT: 5432
+    DUMMYJSON_PRODUCTS_URL: ${DUMMYJSON_PRODUCTS_URL:-https://dummyjson.com/products?limit=0}
+    DUMMYJSON_TIMEOUT_SECONDS: ${DUMMYJSON_TIMEOUT_SECONDS:-10}
+    REDIS_CACHE_URL: redis://redis:6379/1
+    AVG_PRICE_CACHE_TTL_SECONDS: ${AVG_PRICE_CACHE_TTL_SECONDS:-300}
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_IMPORT_INTERVAL_MINUTES: ${CELERY_IMPORT_INTERVAL_MINUTES:-15}
+    CELERY_IMPORT_LOCK_TIMEOUT_SECONDS: ${CELERY_IMPORT_LOCK_TIMEOUT_SECONDS:-600}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-product_statistics}
+      POSTGRES_USER: ${POSTGRES_USER:-product_statistics}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-product_statistics}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --save "" --appendonly no
+    tmpfs:
+      - /data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    build:
+      context: .
+    command: python manage.py migrate --noinput
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  web:
+    <<: *app
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:8000/items?page_size=1', timeout=5)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    init: true
+    restart: unless-stopped
+
+  celery-worker:
+    <<: *app
+    command: >-
+      celery -A config worker --loglevel=INFO
+      --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
+      --prefetch-multiplier=1
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    init: true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  celery-beat:
+    <<: *app
+    command: >-
+      celery -A config beat --loglevel=INFO
+      --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
