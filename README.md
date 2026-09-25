@@ -1,117 +1,118 @@
-# Сервис товарной статистики
+# Product statistics service
 
-Небольшой REST API на Django для импорта товаров из
-[DummyJSON](https://dummyjson.com/docs/products), нормализации данных с помощью
-Pandas, хранения в PostgreSQL и расчёта средней цены по категориям.
+[![CI](https://github.com/nurzhvn52/product-stats-api/actions/workflows/ci.yml/badge.svg)](https://github.com/nurzhvn52/product-stats-api/actions/workflows/ci.yml)
 
-В проекте нет фронтенда, административной панели и форм. Импорт можно запускать
-вручную или по расписанию через Celery Beat.
+A small Django REST API that imports products from
+[DummyJSON](https://dummyjson.com/docs/products), normalizes them with Pandas, stores
+them in PostgreSQL and computes the average price per category.
 
-## Архитектура
+There is no frontend, admin panel or forms. The import runs on demand or on a schedule
+through Celery Beat.
+
+## Architecture
 
 ```mermaid
 flowchart LR
-    Source[DummyJSON или пример JSON] --> Import[Management-команда / Celery-задача]
+    Source[DummyJSON or sample JSON] --> Import[Management command / Celery task]
     Beat[Celery Beat] --> Import
-    Import --> Pandas[Нормализация в Pandas]
+    Import --> Pandas[Normalization in Pandas]
     Pandas --> PostgreSQL[(PostgreSQL 15)]
-    Client[API-клиент] --> Web[Gunicorn + Django REST]
+    Client[API client] --> Web[Gunicorn + Django REST]
     Web --> PostgreSQL
-    Web --> Redis[(Кэш Redis)]
-    Import -. сброс кэша статистики .-> Redis
+    Web --> Redis[(Redis cache)]
+    Import -. invalidates stats cache .-> Redis
 ```
 
-Docker Compose запускает сервисы `web`, `db`, `redis`, `celery-worker`,
-`celery-beat` и одноразовый сервис `migrate`. Контейнеры приложения ожидают
-готовности зависимостей и успешного выполнения миграций.
+Docker Compose starts `web`, `db`, `redis`, `celery-worker`, `celery-beat` and a
+one-off `migrate` service. Application containers wait until their dependencies are
+healthy and the migrations have finished.
 
-## Быстрый запуск
+## Quick start
 
-Для запуска нужен Docker Desktop с Docker Compose.
+You need Docker Desktop with Docker Compose.
 
 ```bash
 docker compose up --build
 ```
 
-Для локальной демонстрации файл `.env` не обязателен: Docker Compose использует
-настройки по умолчанию для разработки. Чтобы изменить конфигурацию, скопируйте
-`.env.example` в `.env` до запуска. За пределами локальной среды обязательно
-замените `DJANGO_SECRET_KEY` и данные доступа к PostgreSQL.
+A `.env` file is optional for a local demo: Compose falls back to development
+defaults. To change the configuration, copy `.env.example` to `.env` before starting.
+Outside a local setup, always replace `DJANGO_SECRET_KEY` and the PostgreSQL
+credentials.
 
-API будет доступен по адресу <http://localhost:8000>. Запуск в фоне с ожиданием
-прохождения healthcheck:
+The API is served at <http://localhost:8000>. To start in the background and wait for
+the health checks:
 
 ```bash
 docker compose up --build --detach --wait
 ```
 
-Остановить сервисы, сохранив данные PostgreSQL:
+Stop the services and keep the PostgreSQL data:
 
 ```bash
 docker compose down
 ```
 
-Команда `docker compose down --volumes` дополнительно удалит том PostgreSQL и
-все импортированные данные.
+`docker compose down --volumes` also removes the PostgreSQL volume with all imported
+data.
 
-## Импорт товаров
+## Importing products
 
-Синхронно импортировать актуальные данные из DummyJSON:
+Import the current DummyJSON data synchronously:
 
 ```bash
 docker compose exec web python manage.py import_items --source remote
 ```
 
-Если внешний источник недоступен, можно загрузить 10 тестовых записей из
+If the external source is unavailable, load 10 sample records from
 `data/sample_products.json`:
 
 ```bash
 docker compose exec web python manage.py import_items --source sample
 ```
 
-Поставить импорт из DummyJSON в очередь Celery:
+Queue a DummyJSON import in Celery:
 
 ```bash
 docker compose exec celery-worker celery -A config call items.import_dummyjson_products
 ```
 
-По умолчанию Celery Beat запускает задачу каждые 15 минут. Интервал задаётся
-переменной `CELERY_IMPORT_INTERVAL_MINUTES`.
+By default Celery Beat runs the task every 15 minutes; the interval is set by
+`CELERY_IMPORT_INTERVAL_MINUTES`.
 
-Импорт идемпотентен. Ограничение уникальности по паре `(source, external_id)`
-не допускает дубликаты. Новые записи создаются, изменённые обновляются, а
-неизменившиеся или устаревшие пропускаются. Запись выполняется транзакционно и
-пакетными операциями. Redis-блокировка не позволяет двум плановым импортам
-работать одновременно, а временные ошибки источника и Redis повторяются с
-увеличивающейся задержкой.
+The import is idempotent. A unique constraint on `(source, external_id)` prevents
+duplicates. New records are created, changed ones are updated, unchanged or outdated
+ones are skipped. Writes happen in a transaction and in batches. A Redis lock keeps two
+scheduled imports from running at the same time, and transient source or Redis errors
+are retried with increasing delays.
 
 ## API
 
-Эндпоинты намеренно объявлены без завершающего `/`.
+Endpoints are declared without a trailing `/` on purpose.
 
-### Получение товаров
+### List products
 
 ```http
 GET /items
 ```
 
-Поддерживаемые query-параметры:
+Supported query parameters:
 
-| Параметр | Описание |
+| Parameter | Description |
 | --- | --- |
-| `category` | Точное совпадение категории |
-| `price_min` | Минимальная цена включительно |
-| `price_max` | Максимальная цена включительно |
-| `page` | Номер страницы, начиная с 1 |
-| `page_size` | Размер страницы: по умолчанию 20, максимум 100 |
+| `category` | Exact category match |
+| `price_min` | Minimum price, inclusive |
+| `price_max` | Maximum price, inclusive |
+| `page` | Page number, starting at 1 |
+| `page_size` | Page size: 20 by default, 100 at most |
 
-Пример запроса с фильтрами и пагинацией:
+Example with filters and pagination:
 
 ```bash
 curl "http://localhost:8000/items?category=beauty&price_min=10&price_max=50&page=1&page_size=5"
 ```
 
-Ответ имеет стандартную структуру пагинации:
+The response uses the standard pagination shape:
 
 ```json
 {
@@ -132,10 +133,10 @@ curl "http://localhost:8000/items?category=beauty&price_min=10&price_max=50&page
 }
 ```
 
-Некорректные цены, диапазоны, номера и размеры страниц возвращают статус `400`.
-Запрос страницы за пределами результата возвращает `404`.
+Invalid prices, ranges, page numbers or page sizes return `400`. A page beyond the
+result returns `404`.
 
-### Средняя цена по категориям
+### Average price per category
 
 ```http
 GET /stats/avg-price-by-category
@@ -145,20 +146,18 @@ GET /stats/avg-price-by-category
 curl -i "http://localhost:8000/stats/avg-price-by-category"
 ```
 
-Агрегат рассчитывается через Pandas и кэшируется в Redis. Заголовок ответа
-`X-Cache` имеет значение `MISS` при расчёте результата и `HIT` при чтении из
-кэша. Если Redis временно недоступен, API продолжает работать и возвращает
-`X-Cache: BYPASS`. Кэш сбрасывается только после создания или обновления
-товаров во время импорта.
+The aggregate is computed with Pandas and cached in Redis. The `X-Cache` response
+header is `MISS` when the result was computed and `HIT` when it came from the cache.
+If Redis is temporarily down, the API keeps working and returns `X-Cache: BYPASS`. The
+cache is invalidated only when an import creates or updates products.
 
-База Redis `/0` используется как брокер Celery, а `/1` — для кэша API. Время
-жизни агрегата задаётся через `AVG_PRICE_CACHE_TTL_SECONDS` и по умолчанию
-составляет 300 секунд.
+Redis database `/0` is the Celery broker and `/1` is the API cache. The aggregate's
+lifetime is set by `AVG_PRICE_CACHE_TTL_SECONDS`, 300 seconds by default.
 
-## Тесты и качество кода
+## Tests and code quality
 
-Для локальной разработки создайте виртуальное окружение Python 3.12 и
-установите зависимости разработчика:
+For local development, create a Python 3.12 virtual environment and install the
+development dependencies:
 
 ```bash
 python -m venv .venv
@@ -168,14 +167,14 @@ ruff format --check .
 ruff check .
 ```
 
-Тесты проверяют нормализацию и расчёт среднего, разбор источников,
-транзакционный и идемпотентный импорт, фильтрацию, пагинацию, валидацию,
-кэширование и его сброс, Redis-блокировку Celery и расписание Beat. Для тестов
-создаётся отдельная временная база PostgreSQL.
+The tests cover normalization and the average calculation, source parsing, the
+transactional and idempotent import, filtering, pagination, validation, caching and
+cache invalidation, the Celery Redis lock and the Beat schedule. They run against a
+separate temporary PostgreSQL database. CI runs the same checks on every push.
 
-## Логи
+## Logs
 
-Приложение и импорт пишут логи в stdout. Их собирает Docker:
+The application and the import log to stdout, which Docker collects:
 
 ```bash
 docker compose logs -f web
